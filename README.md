@@ -2,19 +2,6 @@
 
 Este projeto implementa um sistema de chat com servidor e múltiplos clientes utilizando `socket` e `threading` em Python. A interface gráfica foi construída com **PySide6 (Qt)**. Os usuários podem se conectar, enviar e receber mensagens em tempo real.
 
-## 📁 Estrutura do Projeto
-
-```
-Projeto-Redes-Computadores/
-├── servidor/
-│   └── servidor.py
-├── cliente_window/
-│   └── cliente_window.py
-└── README.md
-```
-
----
-
 ## ⚙️ Requisitos
 
 - Python 3.10 ou superior
@@ -102,8 +89,10 @@ python cliente_window.py
 
 ## 👥 Autores
 
-- [Seu Nome]
-- [Nome dos colegas da equipe]
+- Hugo Stankowich Souza
+- Samuel Medino Silva
+- Lucca Paes Costa
+- Davi Cavalcanti Muritiba
 
 ---
 
