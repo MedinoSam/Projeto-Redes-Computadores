@@ -1,6 +1,5 @@
-# 💻 TRABALHO DE REDES DE COMPUTADORES  
-
-### 💬 CHAT DE TEXTO UTILIZANDO PYTHON E SOCKET
+# 💻 Trabalho de Redes de Computadores
+### 💬 Chat de texto utilizando Python e socket
 
 ### 👥 Alunos
 - **Davi Muritiba**
