@@ -13,7 +13,7 @@ def main():
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
     try:
-        server.bind(('localhost', 9999))
+        server.bind(('localhost', 8888))
         server.listen()
         print('\nServidor iniciado com sucesso! (Digite /parar para encerrar)\n')
     except:
@@ -49,6 +49,11 @@ def messagesTreatment(client):
     try:
         username = client.recv(2048).decode('utf-8')
         clientsNames[client] = username
+
+        # Enviar mensagem para todos que o usuário entrou no chat
+        entrada_msg = f'*** {username} entrou no chat. ***'
+        broadcast(entrada_msg.encode('utf-8'), client)
+
     except:
         return
 

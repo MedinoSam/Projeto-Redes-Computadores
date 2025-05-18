@@ -6,7 +6,7 @@ def main():
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     try:
-        client.connect(('localhost', 9999))
+        client.connect(('localhost', 8888))
     except:
         return print('\nNão foi possível conectar ao servidor\n')
 
@@ -19,7 +19,6 @@ def main():
 
     thread1.start()
     thread2.start()
-
 
 def receiveMessages(client):
     while True:
