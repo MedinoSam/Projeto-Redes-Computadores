@@ -1,143 +1,121 @@
-import sys
 import socket
 import threading
-from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QTextEdit,
-    QLineEdit, QPushButton, QVBoxLayout, QWidget,
-    QDialog, QLabel, QHBoxLayout
-)
-from PySide6.QtCore import Signal, QObject
+import sys
+import os
+
+clientsList = []
+clientsNames = {}
+running = True
+
+def main():
+    global running
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+    try:
+        server.bind(('localhost', 8888))
+        server.listen()
+        print('\nServidor iniciado com sucesso! (Digite /parar para encerrar)\n')
+    except:
+        return print('\nNão foi possível iniciar o servidor\n')
+
+    threading.Thread(target=serverListenCommands, daemon=True).start()
+
+    while running:
+        try:
+            server.settimeout(1.0)
+            client, address = server.accept()
+            clientsList.append(client)
+            thread = threading.Thread(target=messagesTreatment, args=(client,))
+            thread.start()
+        except socket.timeout:
+            continue
+        except:
+            break
 
 
-class MessageReceiver(QObject):
-    message_received = Signal(str)
+def serverListenCommands():
+    global running
+    while True:
+        cmd = input()
+        if cmd.lower() == '/parar':
+            print('\nEncerrando servidor!\n')
+            running = False
+            finishConections()
+            break
 
-    def __init__(self, client_socket):
-        super().__init__()
-        self.client = client_socket
-        self.running = True
 
-    def start_listening(self):
-        while self.running:
-            try:
-                msg = self.client.recv(2048).decode('utf-8')
-                if msg:
-                    self.message_received.emit(msg)
-                else:
-                    self.message_received.emit("Servidor desconectado.")
-                    break
-            except:
-                self.message_received.emit("Erro na conexão com o servidor.")
+def messagesTreatment(client):
+    try:
+        username = client.recv(2048).decode('utf-8')
+        clientsNames[client] = username
+        print(f"Usuário '{username}' conectado ao servidor!\n")
+        broadcast(f"{username} entrou no chat." .encode('utf-8'), client)
+
+        # Enviar mensagem para todos que o usuário entrou no chat
+        entrada_msg = f'*** {username} entrou no chat. ***'
+        broadcast(entrada_msg.encode('utf-8'), client)
+
+    except:
+        return
+
+    while True:
+        try:
+            msg = client.recv(2048).decode('utf-8')
+            if not msg:
+                removeClient(client)
                 break
 
+            if msg.lower() == '/lista':
+                if len(clientsNames) <= 1:
+                    client.send('\nVocê está sozinho na sala no momento.\n'.encode('utf-8'))
+                else:
+                    lista = ', '.join([name for c, name in clientsNames.items() if c != client])
+                    client.send(f'\nUsuários conectados: {lista}\n'.encode('utf-8'))
 
-class UsernameDialog(QDialog):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("Escolha seu nome de usuário")
-        self.setFixedSize(300, 100)
-
-        self.label = QLabel("Digite seu nome de usuário:")
-        self.line_edit = QLineEdit()
-        self.ok_button = QPushButton("OK")
-
-        layout = QVBoxLayout()
-        layout.addWidget(self.label)
-        layout.addWidget(self.line_edit)
-        layout.addWidget(self.ok_button)
-        self.setLayout(layout)
-
-        self.ok_button.clicked.connect(self.accept)
-        self.line_edit.returnPressed.connect(self.accept)
-
-    def get_username(self):
-        return self.line_edit.text().strip()
-
-
-class ChatClient(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("Cliente Chat - PySide6")
-        self.setGeometry(100, 100, 400, 300)
-
-        self.chat_display = QTextEdit()
-        self.chat_display.setReadOnly(True)
-
-        self.input_field = QLineEdit()
-        self.input_field.setPlaceholderText("Digite uma mensagem...")
-        self.send_button = QPushButton("Enviar")
-
-        layout = QVBoxLayout()
-        layout.addWidget(self.chat_display)
-        layout.addWidget(self.input_field)
-        layout.addWidget(self.send_button)
-
-        container = QWidget()
-        container.setLayout(layout)
-        self.setCentralWidget(container)
-
-        # Janela para escolher username
-        username_dialog = UsernameDialog()
-        if username_dialog.exec() == QDialog.Accepted:
-            username = username_dialog.get_username()
-            if not username:
-                username = "UsuarioQt"  # fallback
-        else:
-            sys.exit()  # Sai se não escolher usuário
-
-        self.username = username
-
-        # Conectar ao servidor
-        self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            self.client.connect(('localhost', 8888))
-            self.client.send(self.username.encode('utf-8'))
         except:
-            self.chat_display.append("Não foi possível conectar ao servidor.")
-            self.input_field.setEnabled(False)
-            self.send_button.setEnabled(False)
-            return
+            removeClient(client)
+            break
 
-        # Conectar sinais e slots
-        self.send_button.clicked.connect(self.send_message)
-        self.input_field.returnPressed.connect(self.send_message)
 
-        # Thread para receber mensagens
-        self.receiver = MessageReceiver(self.client)
-        self.receiver.message_received.connect(self.display_message)
-        self.thread = threading.Thread(target=self.receiver.start_listening, daemon=True)
-        self.thread.start()
-
-    def send_message(self):
-        msg = self.input_field.text()
-        if msg:
+def broadcast(msg, client):
+    for clientItem in clientsList:
+        if clientItem != client:
             try:
-                self.client.send(msg.encode('utf-8'))
-                # Mostrar mensagem enviada na tela, com indicação de "Você"
-                self.chat_display.append(f"<Você> {msg}")
-                self.input_field.clear()
+                clientItem.send(msg)
             except:
-                self.chat_display.append("Falha ao enviar mensagem.")
+                removeClient(clientItem)
 
-    def display_message(self, msg):
-        # Aqui, para evitar repetir mensagem própria (que já mostramos),
-        # você pode querer filtrar mensagens que começam com "<username>"
-        # e ignorar se for do próprio usuário, mas isso depende do formato do servidor.
-        # Por ora, só exibe tudo normalmente:
-        if not msg.startswith(f"<{self.username}>"):
-            self.chat_display.append(msg)
 
-    def closeEvent(self, event):
+def removeClient(client):
+    if client in clientsList:
+        clientsList.remove(client)
+
+    username = clientsNames.get(client)
+
+    if username:
+        mensagemSaida = f'{username} saiu do chat.'
+        broadcast(mensagemSaida.encode('utf-8'), client)
+
+    if client in clientsNames:
+        del clientsNames[client]
+    try:
+        client.close()
+    except:
+        pass
+
+
+def finishConections():
+    for client in clientsList:
         try:
-            self.receiver.running = False
-            self.client.close()
+            client.send('\nServidor encerrado.\n'.encode('utf-8'))
+            client.shutdown(socket.SHUT_RDWR)
+            client.close()
         except:
+            print('nao deveria entrar aqui')
             pass
-        event.accept()
+    clientsList.clear()
+    clientsNames.clear()
+    sys.exit()
 
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = ChatClient()
-    window.show()
-    sys.exit(app.exec())
+main()
